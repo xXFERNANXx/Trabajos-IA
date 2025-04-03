@@ -1,9 +1,43 @@
 # Detección de Vida y Emociones
 
-## Como hacerlo?
+## Descripción Inicial
 
-Para empezar necesitamos saber las posiciones de la boca que es la parte con mas expresiones y en base a ello calcular las expresiones vocales, si se combina con las cejas y los ojos tendrá una precision mayor gracias a las expresiones como sorpresa o enojo que alejan o acercan las cejas en relación a la distancia de los ojos de igual manera se puede usar la apertura de los ojos para verificar aun mas expresiones
+- **MediaPipe**: MediaPipe Solutions proporciona un paquete de bibliotecas y herramientas para que apliques rápidamente técnicas de inteligencia artificial (IA) y aprendizaje automático (AA) en tus aplicaciones.
+- **Face Landmarks**: Genera una malla facial con 468 puntos 3D que representan la geometría del rostro.
+- **Modelos adicionales (embeddings)**: Convertir los rasgos faciales en vectores numéricos (embeddings) para comparación.
 
-## Implementación de Seguridad
+## Detección de Emociones
 
-Con mucha fe.
+La detección de emociones se puede implementar combinando los landmarks faciales con un modelo de clasificación:
+
+### Proceso de Detección
+
+- **Extracción de Landmarks**: Obtener todos los 468 puntos de referencia faciales.
+- **Normalización**: Ajustar las coordenadas para ser invariantes a posición y tamaño.
+- **Clasificación**: Usar los landmarks como input a un modelo de ML pre-entrenado.
+
+### Emociones Básicas
+
+- Felicidad (elevación de los labios)
+- Tristeza (caída de los labiales)
+- Sorpresa (elevación de cejas y apertura ocular)
+- Enojo (cejas fruncidas)
+- Neutral (sin expresión)
+
+## Implementación de Seguridad (Anti-Spoofing)
+
+Para prevenir ataques con fotos, vídeos o máscaras, se pueden implementar las siguientes técnicas:
+
+### Métodos de Detección de Vitalidad (Liveness Detection)
+
+- **Análisis de Textura**:
+  - Detectar patrones de impresión o pantalla
+  - Analizar reflectancia de la piel real vs una imagen impresa o similares
+
+- **Movimiento 3D**:
+  - Requerir movimientos de cabeza ( movimientos de cabeza, guiños, sonrisa, etc.)
+  - Analizar la coherencia de los landmarks en el movimiento 3D
+
+- **Parpadeo**:
+  - Detectar el cierre/abertura natural de párpados
+  - Frecuencia y completitud del parpadeo
