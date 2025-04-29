@@ -10,11 +10,13 @@ import pandas as pd
 # Uso de subprocess para ejecutar comandos en la terminal
 import subprocess
 # -------------------------------------------------------------------
-# Modelo 1: Red Neuronal con SkLearn
+# Modelo 1: Red Neuronal
 from sklearn.neural_network import MLPClassifier
 # -------------------------------------------------------------------
-# Modelo 2:
-
+# Modelo 2: Árbol de Decisiones
+from sklearn.tree import DecisionTreeClassifier, export_graphviz
+from sklearn import tree
+import matplotlib.pyplot as plt
 # -------------------------------------------------------------------
 # Modelo 3:
 
@@ -60,7 +62,10 @@ datos_modelo = []
 # Variables Extras
 titulo = pygame.font.SysFont('Arial', 64)
 modelo = 0;
+
+# Variables para los modelos 
 nnNetwork = None
+decisionTree = None
 
 #---------------------------------------------------------------------------------------------------------------------------------
 # Cargar música
@@ -244,8 +249,8 @@ def seleccionar_modelo(num_option):
     
     textos = [
         "Seleccione el modelo (1-4):",
-        "1: Red Neural: SkLearn",
-        "2: Modelo 2",
+        "1: Red Neural",
+        "2: Árbol de Decisiones",
         "3: Modelo 3",
         "4: Modelo 4"
     ]
@@ -285,7 +290,7 @@ def seleccionar_modelo(num_option):
                         menu_activo = False         # Cerrar el menú
                 elif evento.key == pygame.K_2:
                     if num_option == 1:
-                        modelo2()                   # Iniciar Modelo 2:
+                        decision_tree()                  # Iniciar Modelo 2:
                         modelo = 2                  # Actualizar la variable modelo
                         seleccionando = False       # Salir del bucle
                         menu_activo = False         # Cerrar el menú
@@ -321,8 +326,8 @@ def preguntar_sobrescribir_modelo():
     # Textos a mostrar
     textos = [
         "¿Quieres sobrescribir algún modelo?",
-        "1: Red Neural: SkLearn",
-        "2: Modelo 2",
+        "1: Red Neural",
+        "2: Árbol de Decisiones",
         "3: Modelo 3",
         "4: Modelo 4",
         "5: No sobrescribir"
@@ -373,7 +378,7 @@ def sobrescribir_modelo(modelo_num):
     
     switcher = {
         1: 'RedNeural',
-        2: 'Modelo2',
+        2: 'DecisionTree',
         3: 'Modelo3',
         4: 'Modelo4'
     }
@@ -399,8 +404,7 @@ def sobrescribir_modelo(modelo_num):
             datos_modelo.clear()  # Limpiar los datos después de sobrescribir
         case 2:
             # Modelo 2:
-            modelo2()
-            print("Modelo 2: No implementado")
+            decision_tree()
             datos_modelo.clear()  # Limpiar los datos después de sobrescribir
         case 3:
             # Modelo 3:
@@ -420,7 +424,7 @@ def sobrescribir_modelo(modelo_num):
 def graficar(num_modelo):
     switcher = {
         1: 'RedNeural',
-        2: 'Modelo2',
+        2: 'DecisionTree',
         3: 'Modelo3',
         4: 'Modelo4'
     }
@@ -489,9 +493,85 @@ def predecirConRedNeuronal(param_entrada):
         print(f"Valor de salida: {salto}%")
     return nnSalida >= 0.8  # Probabilidad mayor o igual a 80% para saltar
 # --------------------------------------------------------------------------------------------------------------------------------
-# Modelo 2:
-def modelo2():
-    print("Modelo 2: No implementado")
+# Modelo 2: Árbol de Decisiones
+def decision_tree():
+    global decisionTree, modelo
+    # Nombre del modelo
+    model_filename = './Models/DecisionTree.joblib'
+    # Nombre del archivo CSV
+    data_filename = './Models/Data/DecisionTree.csv'
+    # Nombre de la imagen del árbol
+    tree_image_filename = './Models/Images/DecisionTree.png'
+    
+    if os.path.exists(model_filename):
+        # Cargar el modelo si ya existe
+        decisionTree = load(model_filename)
+        print("Modelo de Árbol de Decisiones cargado.")
+    else:
+        # Entrenar un nuevo modelo si no existe
+        X = np.array([dato['input'] for dato in datos_modelo])  # Entradas
+        y = np.array([dato['output'] for dato in datos_modelo]).ravel()  # Salidas (convertir a 1D)
+        
+        # Crear y entrenar el árbol de decisiones
+        decisionTree = DecisionTreeClassifier(
+            max_depth=5,            # Profundidad máxima del árbol
+            min_samples_split=2,    # Mínimo de muestras para dividir un nodo
+            min_samples_leaf=1,     # Mínimo de muestras en una hoja
+            random_state=42        # Semilla para reproducibilidad
+        )
+
+        decisionTree.fit(X, y)                 # Entrenar el modelo
+        dump(decisionTree, model_filename)     # Guardar el modelo entrenado
+        print("Modelo de Árbol de Decisiones entrenado y guardado.")
+        
+        # Guardar los datos de entrenamiento en un CSV
+        datos_csv = {
+            'Distancia': [dato['input'][0] for dato in datos_modelo],
+            'Velocidad': [dato['input'][1] for dato in datos_modelo],
+            'Salto': [dato['output'][0] for dato in datos_modelo]
+        }
+        
+        df = pd.DataFrame(datos_csv)
+        df.to_csv(data_filename, index=False)
+        print(f"Datos de entrenamiento guardados en {data_filename}.")
+        
+        # Generar y guardar imagen del árbol de decisiones
+        generar_imagen_arbol(decisionTree, tree_image_filename)
+
+def generar_imagen_arbol(arbol, filename):
+    # Crear directorio si no existe
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    
+    # Configurar figura
+    plt.figure(figsize=(20, 10))
+    
+    # Graficar el árbol
+    tree.plot_tree(arbol, 
+                    feature_names=['Distancia', 'Velocidad'], 
+                    class_names=['No Saltar', 'Saltar'],
+                    filled=True, 
+                    rounded=True,
+                    proportion=True,
+                    impurity=False)
+    
+    # Guardar la imagen
+    plt.savefig(filename, bbox_inches='tight')
+    plt.close()
+    print(f"Imagen del árbol de decisiones guardada en {filename}")
+
+def predecirConArbolDecisiones(param_entrada):
+    global decisionTree
+    
+    if decisionTree is None:
+        print("Error: El modelo de Árbol de Decisiones no está cargado.")
+        return False
+
+    prediccion = decisionTree.predict([param_entrada])
+    probabilidad = decisionTree.predict_proba([param_entrada])[0][1]
+    
+    if probabilidad > 0.5:
+        print(f"Predicción: {prediccion[0]} (Probabilidad: {probabilidad*100:.2f}%)")
+    return prediccion[0] == 1  # Devuelve True si debe saltar
 # --------------------------------------------------------------------------------------------------------------------------------
 # Modelo 3:
 def modelo3():
@@ -593,12 +673,11 @@ def main():
                         if salto:
                             manejar_salto()
                     case 2:
-                        # Modo automático: Modelo 2
-                        print("Modelo 2: No implementado")
-                        # if not salto:
-                        #     salto = 
-                        # if salto:
-                        #     manejar_salto()
+                        # Modo automático: Árbol de Decisiones
+                        if not salto:
+                            salto = predecirConArbolDecisiones([abs(jugador.x - bala.x), velocidad_bala])
+                        if salto:
+                            manejar_salto()
                     case 3:
                         # Modo automático: Modelo 3
                         print("Modelo 3: No implementado")
@@ -623,7 +702,7 @@ def main():
             update()
         # Actualizar la pantalla
         pygame.display.flip()
-        reloj.tick(90)  # Limitar el juego a 30 FPS
+        reloj.tick(30)  # Limitar el juego a 30 FPS
 
     pygame.quit()
 
