@@ -21,10 +21,12 @@ import graphviz
 # -------------------------------------------------------------------
 # Modelo 3:
 from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import StandardScaler
+from sklearn.multioutput import MultiOutputRegressor
+from sklearn.pipeline import make_pipeline
 # -------------------------------------------------------------------
 # Modelo 4:
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 from sklearn.multioutput import MultiOutputClassifier
 # -------------------------------------------------------------------
@@ -49,20 +51,21 @@ nave = None
 nave2 = None
 menu = None
 posicion_original_x = 90
+posicion_original_y = h - 100
 
 # Variables de salto
 salto = False
 en_suelo = True
-salto_altura = 20  # Velocidad inicial de salto
-gravedad = 2.5
+salto_altura = 15  # Velocidad inicial de salto
+gravedad = 3
 
 # Variables de desplazamiento lateral
 izquierda = False
 ida = False
 vuelta = False
 sin_movimiento = True
-desplazamiento = 120
-velocidad_dezplazamiento = 10
+desplazamiento = 46
+velocidad_dezplazamiento = 6
 
 # Variables de pausa y menú
 pausa = False
@@ -80,6 +83,7 @@ modelo = 0;
 # Variables para los modelos 
 nnNetwork = None
 decisionTree = None
+regresionLineal = None
 
 #---------------------------------------------------------------------------------------------------------------------------------
 # Cargar música
@@ -87,18 +91,18 @@ pygame.mixer.music.load('assets/audio/julijuliwa.mp3')              # Música de
 sonido_muerte = pygame.mixer.Sound('assets/audio/game_over.wav')    # Sonido al morir
 
 # Cargar imagen de la bala
-bala_img = pygame.transform.scale(pygame.image.load(f'assets/sprites/balamario.png').convert_alpha(), (40, 30))
+bala_img = pygame.transform.scale(pygame.image.load(f'assets/sprites/balamario.png').convert_alpha(), (20, 15))
 bala2_img = pygame.transform.rotate(
     pygame.transform.scale(
         pygame.image.load('assets/sprites/balamario.png').convert_alpha(), 
-        (40, 30)
+        (30, 15)
     ), 
     90
 )
 
 # Cargar frames de mona chichona
 jugador_frames = [
-    pygame.transform.scale(pygame.image.load(f'assets/jugadora/Jugadora-Frame-{i}.png').convert_alpha(), (54, 84))
+    pygame.transform.scale(pygame.image.load(f'assets/jugadora/Jugadora-Frame-{i}.png').convert_alpha(), (27, 42))
     for i in range(7)
 ]
 
@@ -132,18 +136,18 @@ frame_speed_fondo = 0.5
 frame_count_fondo = 0
 #--------------------------------------------------------------------------------------------------------------------------------
 # Crear el rectángulo del jugador y de la bala
-jugador = pygame.Rect(posicion_original_x, h - 120, 54, 84)
-bala = pygame.Rect(w - 30, h - 100, 40, 30)
-bala2 = pygame.Rect(100, 5, 30, 40)
-nave = pygame.Rect(w - 90, h - 150, 90, 120)
-nave2 = pygame.Rect(75, 10, 100, 60)
+jugador = pygame.Rect(posicion_original_x, posicion_original_y, 27, 42)
+bala = pygame.Rect(w - 30, h - 78, 30, 15)
+bala2 = pygame.Rect(100, 5, 15, 30)
+nave = pygame.Rect(w - 90, h - 130, 90, 120)
+nave2 = pygame.Rect(60, 10, 100, 60)
 
 # Variables para la bala
-velocidad_bala = -20
+velocidad_bala = -18
 bala_disparada = False
 
 # Variables para la bala2
-velocidad_bala2 = 18
+velocidad_bala2 = 5
 bala2_disparada = False
 
 # ------------------------------------------------------------------------------------------------------------------------------
@@ -152,7 +156,7 @@ bala2_disparada = False
 def disparar_bala():
     global bala_disparada, velocidad_bala
     if not bala_disparada:
-        velocidad_bala = random.randint(-25, -20)  # Velocidad aleatoria negativa para la bala
+        velocidad_bala = random.randint(-20, -18)  # Velocidad aleatoria negativa para la bala
         bala_disparada = True
 
 # Función para disparar la bala2
@@ -170,7 +174,7 @@ def reset_bala():
 # Función para reiniciar la posición de la bala2
 def reset_bala2():
     global bala2, bala2_disparada
-    bala2.y = -5
+    bala2.y = 15
     bala2_disparada = False
 
 # ------------------------------------------------------------------------------------------------------------------------------
@@ -184,10 +188,10 @@ def manejar_salto():
         salto_altura -= gravedad  # Aplicar gravedad (reduce la velocidad del salto)
 
         # Si el jugador llega al suelo, detener el salto
-        if jugador.y >= h - 120:
-            jugador.y = h - 120
+        if jugador.y >= posicion_original_y:
+            jugador.y = posicion_original_y
             salto = False
-            salto_altura = 20  # Restablecer la velocidad de salto
+            salto_altura = 18  # Restablecer la velocidad de salto
             en_suelo = True
 
 # Función para manejar el desplazamiento lateral
@@ -201,10 +205,9 @@ def manejar_desplazamiento():
                 ida = False
                 vuelta = True
         elif vuelta and jugador.x < posicion_original_x:
-            if salto:
-                jugador.x += velocidad_dezplazamiento//2
-            else:
-                jugador.x += velocidad_dezplazamiento
+            
+            jugador.x += velocidad_dezplazamiento
+            
             if jugador.x >= posicion_original_x:
                 jugador.x = posicion_original_x
                 izquierda = False
@@ -265,13 +268,13 @@ def mostrar_menu():
                 if evento.key == pygame.K_a:        # Modo Automático
                     modo_auto = True
                     menu_activo = False
-                    seleccionar_modelo(1)           # Mostrar pantalla de selección de modelo
+                    seleccionar_modelo()           # Mostrar pantalla de selección de modelo
                 elif evento.key == pygame.K_m:      # Modo Manual
                     modo_auto = False
                     menu_activo = False
                 elif evento.key == pygame.K_g:      # Modo Gráfica
                     menu_activo = False
-                    seleccionar_modelo(2)
+                    graficar()
                 elif evento.key == pygame.K_q:      # Salir
                     pygame.quit()
                     exit()
@@ -341,7 +344,7 @@ def guardar_datos():
 # ------------------------------------------------------------------------------------------------------------------------------
 # Funciones para los modelo + grafciar
 # Función para seleccionar el modelo en modo automático
-def seleccionar_modelo(num_option):
+def seleccionar_modelo():
     global modelo, menu_activo
     pantalla.fill(NEGRO)
     
@@ -377,45 +380,25 @@ def seleccionar_modelo(num_option):
                 exit()
             if evento.type == pygame.KEYDOWN:
                 if evento.key == pygame.K_1:
-                    if num_option == 1:
-                        enRedNeural()               # Iniciar Modelo 1: Red Neuronal
-                        modelo = 1                  # Actualizar la variable modelo
-                        seleccionando = False       # Salir del bucle
-                        menu_activo = False         # Cerrar el menú
-                    elif num_option == 2:
-                        graficar(1)                 # Graficar Modelo 1: Red Neuronal
-                        seleccionando = False       # Salir del bucle
-                        menu_activo = False         # Cerrar el menú
+                    enRedNeural()               # Iniciar Modelo 1: Red Neuronal
+                    modelo = 1                  # Actualizar la variable modelo
+                    seleccionando = False       # Salir del bucle
+                    menu_activo = False         # Cerrar el menú
                 elif evento.key == pygame.K_2:
-                    if num_option == 1:
-                        decision_tree()                  # Iniciar Modelo 2:
-                        modelo = 2                  # Actualizar la variable modelo
-                        seleccionando = False       # Salir del bucle
-                        menu_activo = False         # Cerrar el menú
-                    elif num_option == 2:
-                        graficar(2)                 # Graficar Modelo 2
-                        seleccionando = False       # Salir del bucle
-                        menu_activo = False         # Cerrar el menú
+                    decision_tree()                  # Iniciar Modelo 2:
+                    modelo = 2                  # Actualizar la variable modelo
+                    seleccionando = False       # Salir del bucle
+                    menu_activo = False         # Cerrar el menú
                 elif evento.key == pygame.K_3:
-                    if num_option == 1:
-                        regrecionLineal()                   # Iniciar Modelo 3:
-                        modelo = 3                  # Actualizar la variable modelo
-                        seleccionando = False       # Salir del bucle
-                        menu_activo = False         # Cerrar el menú
-                    elif num_option == 2:
-                        graficar(3)                 # Graficar Modelo 3
-                        seleccionando = False       # Salir del bucle
-                        menu_activo = False         # Cerrar el menú
+                    regrecionLineal()                   # Iniciar Modelo 3:
+                    modelo = 3                  # Actualizar la variable modelo
+                    seleccionando = False       # Salir del bucle
+                    menu_activo = False         # Cerrar el menú
                 elif evento.key == pygame.K_4:
-                    if num_option == 1:
-                        kNearestNeighbor()                   # Iniciar Modelo 4:
-                        modelo = 4                  # Actualizar la variable modelo
-                        seleccionando = False       # Salir del bucle
-                        menu_activo = False         # Cerrar el menú
-                    elif num_option == 2:
-                        graficar(4)                 # Graficar Modelo 4
-                        seleccionando = False       # Salir del bucle
-                        menu_activo = False         # Cerrar el menú                       # Volver al menú principal después de seleccionar
+                    kNearestNeighbor()                   # Iniciar Modelo 4:
+                    modelo = 4                  # Actualizar la variable modelo
+                    seleccionando = False       # Salir del bucle
+                    menu_activo = False         # Cerrar el menú                 # Volver al menú principal después de seleccionar
 
 # Función para preguntar si se desea sobrescribir un modelo existente
 def preguntar_sobrescribir_modelo():
@@ -424,27 +407,24 @@ def preguntar_sobrescribir_modelo():
     
     # Textos a mostrar
     textos = [
-        "¿Quieres sobrescribir algún modelo?",
-        "1: Red Neural",
-        "2: Árbol de Decisiones",
-        "3: Regreción Lineal",
-        "4: K Nearest Neighbor",
-        "5: No sobrescribir"
+        "¿Deseas entrenar nuevos modelos?",
+        "1: SI",
+        "2: NO"
     ]
     
     y_offset = h // 2 - 160
     for texto in textos:
-        if texto == "¿Quieres sobrescribir algún modelo?":
+        if texto == "¿Deseas entrenar nuevos modelos?":
             texto_renderizado = titulo.render(texto, True, BLANCO)
         else:
             texto_renderizado = fuente.render(texto, True, BLANCO)
-        texto_ancho = texto_renderizado.get_width()  # Obtener el ancho del texto
-        texto_x = (w - texto_ancho) // 2  # Calcular la posición X para centrar
-        pantalla.blit(texto_renderizado, (texto_x, y_offset))  # Dibujar el texto
-        if texto == "¿Quieres sobrescribir algún modelo?":
-            y_offset += 150  # Espacio entre líneas
+        texto_ancho = texto_renderizado.get_width()
+        texto_x = (w - texto_ancho) // 2
+        pantalla.blit(texto_renderizado, (texto_x, y_offset))
+        if texto == "¿Deseas entrenar nuevos modelos?":
+            y_offset += 150
         else:
-            y_offset += 50  # Espacio entre líneas
+            y_offset += 50
     
     pygame.display.flip()
 
@@ -455,92 +435,75 @@ def preguntar_sobrescribir_modelo():
                 pygame.quit()
                 exit()
             if evento.type == pygame.KEYDOWN:
-                if evento.key == pygame.K_1:    # Sobrescribir Modelo 1
-                    sobrescribir_modelo(1)
-                    seleccionando = False
-                elif evento.key == pygame.K_2:  # Sobrescribir Modelo 2
-                    sobrescribir_modelo(2)
-                    seleccionando = False
-                elif evento.key == pygame.K_3:  # Sobrescribir Modelo 3
-                    sobrescribir_modelo(3)
-                    seleccionando = False
-                elif evento.key == pygame.K_4:  # Sobrescribir Modelo 4
-                    sobrescribir_modelo(4)
-                    seleccionando = False
-                elif evento.key == pygame.K_5:  # No sobrescribir
-                    datos_modelo.clear()        # Limpiar los datos sin sobrescribir           # Limpiar los datos sin sobrescribir
-                    seleccionando = False
-    mostrar_menu()                              # Volver al menú principal después de seleccionar
+                if evento.key == pygame.K_1:
+                    datos_csv = {
+                        'Distancia_Bala': [dato['input'][0] for dato in datos_modelo],
+                        'Velocidad_Bala': [dato['input'][1] for dato in datos_modelo],
+                        'Distancia_Bala2': [dato['input'][2] for dato in datos_modelo],
+                        'Salto': [dato['output'][0] for dato in datos_modelo],
+                        'Izquierda': [dato['output'][1] for dato in datos_modelo]
+                    }
+                    
+                    df = pd.DataFrame(datos_csv)
+                    df.to_csv('./Models/Data/Data_Entrenmiento.csv', index=False)
+                    
+                    modelos = [
+                        'RedNeural', 
+                        'DecisionTree', 
+                        'RegrecionLineal', 
+                        'KNearestNeighbor'
+                    ]
+                    
+                    for modelo_nombre in modelos:
+                        # Eliminar archivos del modelo
+                        model_path = f'./Models/{modelo_nombre}.joblib'
+                        if os.path.exists(model_path):
+                            os.remove(model_path)
+                        
+                        # Eliminar archivos de imágenes (para árbol de decisiones)
+                        img_paths = [
+                            f'./Models/PDF/{modelo_nombre}.dot',
+                            f'./Models/PDF/{modelo_nombre}.pdf',
+                            f'./Models/PDF/{modelo_nombre}.png'
+                        ]
+                        for path in img_paths:
+                            if os.path.exists(path):
+                                os.remove(path)
 
-# Función para sobrescribir un modelo existente si lo desea el usuario
-def sobrescribir_modelo(modelo_num):
-    global datos_modelo
+                    enRedNeural()
+                    decision_tree()
+                    regrecionLineal()
+                    kNearestNeighbor()
+                    
+                    print("Todos los modelos han sido entrenados")
+                    
+                    seleccionando = False
+                    
+                elif evento.key == pygame.K_2:  # No - Conservar modelos actuales
+                    datos_modelo.clear()
+                    seleccionando = False
     
-    switcher = {
-        1: 'RedNeural',
-        2: 'DecisionTree',
-        3: 'RegrecionLineal',
-        4: 'KNearestNeighbor'
-    }
-    
-    modelo_nombre = switcher.get(modelo_num, 'ModeloDesconocido')
-    base_path = f'./Models/{modelo_nombre}'
-    data_path = f'./Models/Data/{modelo_nombre}'
-    images_path = f'./Models/Images/{modelo_nombre}'
-    
-    # Eliminar todos los archivos relacionados
-    for path, extensions in [
-        (base_path, ['.joblib']),
-        (data_path, ['.csv']),
-        (images_path, ['.dot', '.pdf', '.png'])
-    ]:
-        for ext in extensions:
-            file_path = f"{path}{ext}"
-            if os.path.exists(file_path):
-                os.remove(file_path)
-                print(f"Archivo eliminado: {file_path}")
-    
-    # Entrenar nuevo modelo según el tipo
-    match modelo_num:
-        case 1:
-            enRedNeural()
-        case 2:
-            decision_tree()
-        case 3:
-            regrecionLineal()
-        case 4:
-            kNearestNeighbor()
-        case _:
-            print("Modelo Desconocido")
-    
-    datos_modelo.clear()
+    mostrar_menu()
 
 # Función para graficar el dataset de entrenamiento almacenado en un archivo CSV
-def graficar(num_modelo):
-    switcher = {
-        1: 'RedNeural',
-        2: 'DecisionTree',
-        3: 'RegrecionLineal',
-        4: 'KNearestNeighbor'
-    }
-
-    modelo_nombre = switcher.get(num_modelo, 'ModeloDesconocido')
-    data_filename = f'./Models/Data/{modelo_nombre}.csv'
+def graficar():
+    # Usar siempre el mismo archivo de datos
+    data_filename = './Models/Data/Data_Entrenmiento.csv'
     
     if not os.path.exists(data_filename):
-        print(f"No existe archivo de datos para {modelo_nombre}")
+        print(f"No existe archivo de datos de entrenamiento: {data_filename}")
         mostrar_menu()
         return
     
     python_path = '../.venv/Scripts/python.exe'
     
-    # Ejecutar grafica.py con argumentos adicionales para manejar las nuevas columnas
+    # Ejecutar el script de graficación
     subprocess.run([
         python_path, 
         './grafica.py', 
         data_filename,
         '--features', 'Distancia_Bala', 'Velocidad_Bala', 'Distancia_Bala2',
-        '--targets', 'Salto', 'Derecha', 'Izquierda'
+        '--targets', 'Salto', 'Izquierda'
     ])
     
     mostrar_menu()
@@ -562,107 +525,50 @@ def asegurar_directorios():
 # Modelo 1: Red Neuronal usando SkLearn
 def enRedNeural():
     global nnNetwork, modelo
-    asegurar_directorios()
+    # Nombre del modelo
     model_filename = './Models/RedNeural.joblib'
-    data_filename = './Models/Data/RedNeural.csv'
     
     if os.path.exists(model_filename):
+        # Cargar el modelo si ya existe
         nnNetwork = load(model_filename)
-        print("Modelo de Red Neuronal cargado.")
-        return
-    
-    if len(datos_modelo) < 50:
-        print("⚠️ Advertencia: Insuficientes datos para entrenar. Necesitas al menos 50 ejemplos.")
-        return
-    
-    try:
-        X = []
-        y_salto = []
-        y_izquierda = []
+        print("Modelo cargado.")
+    else:
+        # Entrenar un nuevo modelo si no existe
+        X = np.array([dato['input'] for dato in datos_modelo])  # Entradas
+        y = np.array([dato['output'] for dato in datos_modelo])  # Salidas (ahora con dos salidas)
         
-        for dato in datos_modelo:
-            input_data = dato['input']
-            X.append([input_data[0], input_data[1], input_data[2]])
-            
-            output = dato['output']
-            y_salto.append(output[0])
-            y_izquierda.append(output[1])
-        
-        X = np.array(X)
-        y = np.column_stack((y_salto, y_izquierda))
-        
+        # Crear y entrenar la red neuronal para múltiples salidas
         nnNetwork = MLPClassifier(
-            hidden_layer_sizes=(64, 32),
-            activation='relu',
-            solver='adam',
-            alpha=0.0001,
-            learning_rate_init=0.001,
-            max_iter=500,
-            early_stopping=True,
-            validation_fraction=0.15,
-            n_iter_no_change=20,
-            tol=0.0005,
-            random_state=42,
-            verbose=False
+            hidden_layer_sizes=(10,),  # Una capa oculta con 10 neuronas
+            activation='relu',         # Función de activación ReLU
+            learning_rate_init=0.01,   # Tasa de aprendizaje
+            max_iter=40000,            # Número máximo de iteraciones
+            random_state=42            # Semilla para reproducibilidad
         )
 
-        print("\nEntrenando Red Neuronal...")
-        nnNetwork.fit(X, y)
-        
-        if nnNetwork.n_iter_ == nnNetwork.max_iter:
-            print("⚠️ Advertencia: El modelo no convergió completamente")
-        
-        dump(nnNetwork, model_filename)
-        
-        datos_csv = {
-            'Distancia_Bala': [d[0] for d in X],
-            'Velocidad_Bala': [d[1] for d in X],
-            'Distancia_Bala2': [d[2] for d in X],
-            'Salto': y_salto,
-            'Izquierda': y_izquierda
-        }
-        pd.DataFrame(datos_csv).to_csv(data_filename, index=False)
-        print("✅ Red Neuronal entrenada y guardada exitosamente")
-        
-    except Exception as e:
-        print(f"❌ Error crítico durante el entrenamiento: {str(e)}")
-        for f in [model_filename, data_filename]:
-            if os.path.exists(f):
-                try:
-                    os.remove(f)
-                except:
-                    pass
-        raise
+        nnNetwork.fit(X, y)                 # Entrenar el modelo
+        dump(nnNetwork, model_filename)     # Guardar el modelo entrenado
+        print("Modelo entrenado y guardado.")
 
 def predecirConRedNeuronal(param_entrada):
     global nnNetwork
-    if nnNetwork is None:
-        print("Modelo de Red Neuronal no cargado")
-        return False, False
     
+    if nnNetwork is None:
+        enRedNeural()
+        print(f"Error: El modelo no está cargado.")
+        return False, False
+
     try:
-        entrada = param_entrada[:3] if len(param_entrada) > 3 else param_entrada
-        if len(entrada) < 3:
-            entrada = list(entrada) + [0] * (3 - len(entrada))
-        
-        proba = nnNetwork.predict_proba([entrada])
-        
-        if isinstance(proba, list):
-            prob_salto = proba[0][0][1] if len(proba[0][0]) > 1 else 0
-            prob_izquierda = proba[1][0][1] if len(proba[1][0]) > 1 else 0
-        else:
-            prob_salto = prob_izquierda = proba[0][1] if len(proba[0]) > 1 else 0
-        
+        # Primero usa predict para ver la estructura de salida
+        clase_predicha = nnNetwork.predict([param_entrada])
         print("\n--- Predicción Red Neuronal ---")
-        print(f"Input: {entrada}")
-        print(f"Probabilidad de Saltar: {prob_salto:.2f}")
-        print(f"Probabilidad de Izquierda: {prob_izquierda:.2f}")
+        print(f"Input: {param_entrada}")
+        print(f"Predicción: {clase_predicha}")
         
-        return (
-            prob_salto > 0.65,
-            prob_izquierda > 0.55
-        )
+        saltar = clase_predicha[0][0]
+        izquierda = clase_predicha[0][1]
         
+        return saltar == 1, izquierda == 1
     except Exception as e:
         print(f"Error en predicción Red Neuronal: {str(e)}")
         return False, False
@@ -674,210 +580,97 @@ def decision_tree():
     
     asegurar_directorios()
     model_filename = os.path.abspath('./Models/DecisionTree.joblib')
-    data_filename = os.path.abspath('./Models/Data/DecisionTree.csv')
-    tree_filename_base = os.path.abspath('./Models/PDF/DecisionTree')
     
     if os.path.exists(model_filename):
         decisionTree = load(model_filename)
         print("Modelo de Árbol de Decisiones cargado.")
     else:
-        for ext in ['.joblib', '.csv', '.dot', '.pdf', '.png']:
-            file_path = f"{tree_filename_base}{ext}" if ext in ['.dot', '.pdf', '.png'] else model_filename if ext == '.joblib' else data_filename
-            if os.path.exists(file_path):
-                os.remove(file_path)
-    
+        # Preparar datos para un solo árbol con múltiples salidas
         X = []
-        y_salto = []
-        y_izquierda = []
+        y = []
         
         for dato in datos_modelo:
             X.append(dato['input'])
-            output = dato['output']
-            y_salto.append(output[0])
-            y_izquierda.append(output[1])
+            y.append(dato['output'])
         
         X = np.array(X)
+        y = np.array(y)
         
-        decisionTree = {
-            'salto': DecisionTreeClassifier(
-                max_depth=5,
-                min_samples_split=10,
-                random_state=42
-            ),
-            'izquierda': DecisionTreeClassifier(
-                max_depth=5,
-                min_samples_split=10,
-                random_state=42
-            )
-        }
+        # Crear un solo árbol de decisiones para múltiples salidas
+        decisionTree = DecisionTreeClassifier(
+            max_depth=10,
+            random_state=42
+        )
         
-        print("\nEntrenando Árboles de Decisión...")
-        decisionTree['salto'].fit(X, y_salto)
-        decisionTree['izquierda'].fit(X, y_izquierda)
+        print("\nEntrenando Árbol de Decisiones único...")
+        decisionTree.fit(X, y)
         
+        # Guardar el modelo
         dump(decisionTree, model_filename)
         
-        datos_csv = {
-            'Distancia_Bala': [d[0] for d in X],
-            'Velocidad_Bala': [d[1] for d in X],
-            'Distancia_Bala2': [d[2] for d in X],
-            'Salto': y_salto,
-            'Izquierda': y_izquierda
-        }
-        pd.DataFrame(datos_csv).to_csv(data_filename, index=False)
-
-        for accion in ['salto', 'izquierda']:
-            generar_pdf_arbol(decisionTree[accion], f"{tree_filename_base}_{accion}", accion)
-        
-        print("Modelo de Árbol de Decisiones entrenado y guardado.")
+        print("Modelo de Árbol de Decisiones único entrenado y guardado.")
 
 def predecirConArbolDecisiones(param_entrada):
     global decisionTree
-    if decisionTree is None or not isinstance(decisionTree, dict):
+    if decisionTree is None:
+        decision_tree()
         return False, False
     
     try:
-        saltar = decisionTree['salto'].predict([param_entrada])[0] == 1
-        izquierda = decisionTree['izquierda'].predict([param_entrada])[0] == 1
+        # Predecir ambas salidas con un solo árbol
+        prediccion = decisionTree.predict([param_entrada])[0]
         
-        print("\n--- Predicción Árbol Decisiones ---")
+        print("\nPredicción Árbol Decisiones")
         print(f"Input: {param_entrada}")
-        print(f"Saltar: {'Sí' if saltar else 'No'}")
-        print(f"Izquierda: {'Sí' if izquierda else 'No'}")
-        print("----------------------------------")
+        print(f"Predicción: {prediccion}")
         
-        return saltar, izquierda
+        return prediccion[0] == 1, prediccion[1] == 1
     except Exception as e:
         print(f"Error en predicción Árbol Decisiones: {str(e)}")
         return False, False
 
-def generar_pdf_arbol(arbol, filename_base, accion):
-    try:
-        # Asegurar que el directorio existe
-        os.makedirs(os.path.dirname(filename_base), exist_ok=True)
-        
-        # Verificar que graphviz esté instalado correctamente
-        if not hasattr(graphviz, 'Source'):
-            raise ImportError("Graphviz no está instalado correctamente")
-        
-        # Nombres de archivo temporales
-        dot_file = f"{filename_base}.dot"
-        pdf_file = f"{filename_base}.pdf"
-        png_file = f"{filename_base}.png"
-        
-        # Limpiar archivos existentes
-        for f in [dot_file, pdf_file, png_file]:
-            if os.path.exists(f):
-                try:
-                    os.remove(f)
-                except PermissionError:
-                    print(f"Error: No se pudo eliminar {f} - Permiso denegado")
-                    continue
-        
-        # Exportar a formato DOT
-        tree.export_graphviz(
-            arbol,
-            out_file=dot_file,
-            feature_names=['Distancia_Bala', 'Velocidad_Bala', 'Distancia_Bala2'],
-            class_names=['No_'+accion.capitalize(), accion.capitalize()],
-            filled=True,
-            rounded=True,
-            special_characters=True,
-            proportion=True
-        )
-        
-        # Verificar que el archivo DOT se creó
-        if not os.path.exists(dot_file):
-            raise FileNotFoundError(f"No se pudo crear el archivo DOT: {dot_file}")
-        
-        # Generar gráficos
-        graph = graphviz.Source.from_file(dot_file)
-        
-        # Renderizar a PDF
-        try:
-            pdf_path = graph.render(
-                filename=filename_base,
-                format='pdf',
-                cleanup=True,
-                quiet=True
-            )
-            if not os.path.exists(pdf_path):
-                raise RuntimeError(f"El archivo PDF no se generó: {pdf_path}")
-            print(f"✓ PDF generado: {pdf_path}")
-        except Exception as pdf_error:
-            print(f"Error al generar PDF: {str(pdf_error)}")
-        
-        # Renderizar a PNG
-        try:
-            png_path = graph.render(
-                filename=filename_base,
-                format='png',
-                cleanup=True,
-                quiet=True
-            )
-            if not os.path.exists(png_path):
-                raise RuntimeError(f"El archivo PNG no se generó: {png_path}")
-            print(f"✓ PNG generado: {png_path}")
-        except Exception as png_error:
-            print(f"Error al generar PNG: {str(png_error)}")
-        
-    except Exception as e:
-        print(f"❌ Error crítico al generar árbol para {accion}: {str(e)}")
-        # Intenta limpiar archivos temporales en caso de error
-        for f in [dot_file, pdf_file, png_file]:
-            if os.path.exists(f):
-                try:
-                    os.remove(f)
-                except:
-                    pass
-
 # --------------------------------------------------------------------------------------------------------------------------------
 # Modelo 3: Regresión Lineal
 def regrecionLineal():
-    global modelo3_regression, modelo
+    global regresionLineal, modelo
     asegurar_directorios()
     model_filename = './Models/RegrecionLineal.joblib'
-    data_filename = './Models/Data/RegrecionLineal.csv'
     
     if os.path.exists(model_filename):
-        modelo3_regression = load(model_filename)
+        regresionLineal = load(model_filename)
         print("Modelo de Regresión Lineal cargado.")
     else:
         X = np.array([dato['input'][:3] for dato in datos_modelo])
         y = np.array([dato['output'] for dato in datos_modelo])
         
-        from sklearn.multioutput import MultiOutputRegressor
         modelo3_regression = MultiOutputRegressor(
-            LinearRegression(normalize=True)
+            make_pipeline(
+                StandardScaler(),
+                LinearRegression()
+            )
         )
         
         print("\nEntrenando Regresión Lineal...")
         modelo3_regression.fit(X, y)
         dump(modelo3_regression, model_filename)
-        
-        datos_csv = {
-            'Distancia_Bala': [d[0] for d in X],
-            'Velocidad_Bala': [d[1] for d in X],
-            'Distancia_Bala2': [d[2] for d in X],
-            'Salto': [o[0] for o in y],
-            'Izquierda': [o[1] for o in y]
-        }
-        pd.DataFrame(datos_csv).to_csv(data_filename, index=False)
-        print("✅ Regresión Lineal entrenada y guardada")
 
 def predecirConRegresionLineal(param_entrada):
-    global modelo3_regression
-    if modelo3_regression is None:
+    global regresionLineal
+    if regresionLineal is None:
         return False, False
     
     try:
         entrada = param_entrada[:3] if len(param_entrada) > 3 else param_entrada
-        prediccion = modelo3_regression.predict([entrada])[0]
         
-        from scipy.special import expit
+        prediccion = regresionLineal.predict([entrada])[0]
+
+        print("\n--- Predicción Regresión Lineal ---")
+        print(f"Input: {entrada}")
+        print(f"Predicción: {prediccion}")
+        
         return (
-            expit(prediccion[0]) > 0.55,
-            expit(prediccion[1]) > 0.5
+            prediccion[0] > 0.55,  # Convertir a probabilidad con función sigmoide
+            prediccion[1] > 0.50
         )
     except Exception as e:
         print(f"Error en predicción Regresión Lineal: {str(e)}")
@@ -889,7 +682,6 @@ def kNearestNeighbor():
     global knnModel, modelo
     asegurar_directorios()
     model_filename = './Models/KNearestNeighbor.joblib'
-    data_filename = './Models/Data/KNearestNeighbor.csv'
     
     if os.path.exists(model_filename):
         knnModel = load(model_filename)
@@ -914,16 +706,6 @@ def kNearestNeighbor():
         print("\nEntrenando KNN...")
         knnModel.fit(X, y)
         dump(knnModel, model_filename)
-        
-        datos_csv = {
-            'Distancia_Bala': [d[0] for d in X],
-            'Velocidad_Bala': [d[1] for d in X],
-            'Distancia_Bala2': [d[2] for d in X],
-            'Salto': [o[0] for o in y],
-            'Izquierda': [o[1] for o in y]
-        }
-        pd.DataFrame(datos_csv).to_csv(data_filename, index=False)
-        print("✅ KNN entrenado y guardado")
 
 def predecirConKNN(param_entrada):
     global knnModel
@@ -933,6 +715,9 @@ def predecirConKNN(param_entrada):
     try:
         entrada = param_entrada[:3] if len(param_entrada) > 3 else param_entrada
         prediccion = knnModel.predict([entrada])[0]
+        print("\n--- Predicción KNN ---")
+        print(f"Input: {entrada}")
+        print(f"Predicción: {prediccion}")
         return (
             prediccion[0] == 1,
             prediccion[1] == 1
@@ -979,7 +764,7 @@ def update():
         reset_bala()
 
     # Si la bala2 sale de la pantalla, reiniciar su posición
-    if bala2.y > h:
+    if bala2.y >= h-20:
         reset_bala2()
 
     # Dibujar el jugador con la animación (ENCIMA DEL FONDO)
