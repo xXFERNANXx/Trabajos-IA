@@ -630,53 +630,6 @@ def predecirConArbolDecisiones(param_entrada):
         return False, False
 
 # --------------------------------------------------------------------------------------------------------------------------------
-# Modelo 3: Regresión Lineal
-def regrecionLineal():
-    global regresionLineal, modelo
-    asegurar_directorios()
-    model_filename = './Models/RegrecionLineal.joblib'
-    
-    if os.path.exists(model_filename):
-        regresionLineal = load(model_filename)
-        print("Modelo de Regresión Lineal cargado.")
-    else:
-        X = np.array([dato['input'][:3] for dato in datos_modelo])
-        y = np.array([dato['output'] for dato in datos_modelo])
-        
-        modelo3_regression = MultiOutputRegressor(
-            make_pipeline(
-                StandardScaler(),
-                LinearRegression()
-            )
-        )
-        
-        print("\nEntrenando Regresión Lineal...")
-        modelo3_regression.fit(X, y)
-        dump(modelo3_regression, model_filename)
-
-def predecirConRegresionLineal(param_entrada):
-    global regresionLineal
-    if regresionLineal is None:
-        return False, False
-    
-    try:
-        entrada = param_entrada[:3] if len(param_entrada) > 3 else param_entrada
-        
-        prediccion = regresionLineal.predict([entrada])[0]
-
-        print("\n--- Predicción Regresión Lineal ---")
-        print(f"Input: {entrada}")
-        print(f"Predicción: {prediccion}")
-        
-        return (
-            prediccion[0] > 0.55,  # Convertir a probabilidad con función sigmoide
-            prediccion[1] > 0.50
-        )
-    except Exception as e:
-        print(f"Error en predicción Regresión Lineal: {str(e)}")
-        return False, False
-
-# --------------------------------------------------------------------------------------------------------------------------------
 # Modelo 4:
 def kNearestNeighbor():
     global knnModel, modelo
@@ -724,6 +677,53 @@ def predecirConKNN(param_entrada):
         )
     except Exception as e:
         print(f"Error en predicción KNN: {str(e)}")
+        return False, False
+
+# --------------------------------------------------------------------------------------------------------------------------------
+# Modelo 3: Regresión Lineal
+def regrecionLineal():
+    global regresionLineal, modelo
+    asegurar_directorios()
+    model_filename = './Models/RegrecionLineal.joblib'
+    
+    if os.path.exists(model_filename):
+        regresionLineal = load(model_filename)
+        print("Modelo de Regresión Lineal cargado.")
+    else:
+        X = np.array([dato['input'][:3] for dato in datos_modelo])
+        y = np.array([dato['output'] for dato in datos_modelo])
+        
+        modelo3_regression = MultiOutputRegressor(
+            make_pipeline(
+                StandardScaler(),
+                LinearRegression()
+            )
+        )
+        
+        print("\nEntrenando Regresión Lineal...")
+        modelo3_regression.fit(X, y)
+        dump(modelo3_regression, model_filename)
+
+def predecirConRegresionLineal(param_entrada):
+    global regresionLineal
+    if regresionLineal is None:
+        return False, False
+    
+    try:
+        entrada = param_entrada[:3] if len(param_entrada) > 3 else param_entrada
+        
+        prediccion = regresionLineal.predict([entrada])[0]
+
+        print("\n--- Predicción Regresión Lineal ---")
+        print(f"Input: {entrada}")
+        print(f"Predicción: {prediccion}")
+        
+        return (
+            prediccion[0] > 0.55,  # Convertir a probabilidad con función sigmoide
+            prediccion[1] > 0.50
+        )
+    except Exception as e:
+        print(f"Error en predicción Regresión Lineal: {str(e)}")
         return False, False
 
 # --------------------------------------------------------------------------------------------------------------------------------
