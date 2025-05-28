@@ -268,14 +268,6 @@ from bs4 import BeautifulSoup
 import pygame
 ```
 
-## Metodología del Curso
-
-- **Clases teóricas**: Fundamentos conceptuales
-- **Laboratorios prácticos**: Implementación de algoritmos
-- **Proyectos**: Aplicación de conocimientos en problemas reales
-- **Seminarios**: Discusión de casos de estudio actuales
-- **Evaluación continua**: Ejercicios y proyectos
-
 ## Referencias y Enlaces
 
 - **Sitio web del curso**: [Apuntes IA](https://ealcaraz85.github.io/IA.io/)
